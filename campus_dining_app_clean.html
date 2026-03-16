@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -120,7 +120,8 @@
         content: "";
         position: absolute;
         inset: 0;
-        background: radial-gradient(
+        background:
+          radial-gradient(
             ellipse 60% 50% at 80% 10%,
             rgba(200, 92, 42, 0.18) 0%,
             transparent 60%
@@ -247,7 +248,9 @@
         font-size: 15px;
         font-weight: 600;
         cursor: pointer;
-        transition: background 0.2s, transform 0.1s;
+        transition:
+          background 0.2s,
+          transform 0.1s;
         margin-top: 8px;
       }
       .btn-login:hover {
@@ -630,7 +633,9 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         overflow: hidden;
-        transition: box-shadow 0.2s, transform 0.2s;
+        transition:
+          box-shadow 0.2s,
+          transform 0.2s;
         cursor: pointer;
       }
       .menu-card:hover {
@@ -1477,7 +1482,9 @@
               </div>
               <div
                 style="
-                  font-family: JetBrains Mono, monospace;
+                  font-family:
+                    JetBrains Mono,
+                    monospace;
                   font-size: 8px;
                   letter-spacing: 2px;
                   color: rgba(255, 255, 255, 0.32);
@@ -1551,7 +1558,10 @@
             autocomplete="off"
             maxlength="6"
             inputmode="numeric"
-            oninput="this.value=this.value.replace(/[^0-9]/g,''); clearError('fg-id')"
+            oninput="
+              this.value = this.value.replace(/[^0-9]/g, '');
+              clearError('fg-id');
+            "
           />
           <span class="field-error" id="err-id"
             >ID must be exactly 6 digits (numbers only).</span
@@ -1936,7 +1946,7 @@
                       border: 1px solid var(--border);
                       border-radius: 8px;
                       background: var(--surface);
-                      font-family: 'DM Sans', sans-serif;
+                      font-family: &quot;DM Sans&quot;, sans-serif;
                       font-size: 13px;
                       outline: none;
                     "
@@ -2298,7 +2308,7 @@
               <span
                 id="item-qty"
                 style="
-                  font-family: 'Fraunces', serif;
+                  font-family: &quot;Fraunces&quot;, serif;
                   font-size: 24px;
                   font-weight: 700;
                   min-width: 40px;
@@ -2335,7 +2345,7 @@
             <span style="color: var(--text2); font-size: 13px">Item Total</span>
             <span
               style="
-                font-family: 'Fraunces', serif;
+                font-family: &quot;Fraunces&quot;, serif;
                 font-size: 22px;
                 font-weight: 700;
                 color: var(--accent);
@@ -2413,7 +2423,10 @@
             </button>
             <button
               class="btn btn-primary w-full"
-              onclick="closeModal('receipt-modal');navigateTo('page-orders')"
+              onclick="
+                closeModal('receipt-modal');
+                navigateTo('page-orders');
+              "
             >
               Track Order
             </button>
@@ -2613,6 +2626,32 @@
   </body>
 </html>
 <script>
+  // API CONFIGURATION
+  const API_BASE_URL = "http://127.0.0.1:8000";
+
+  // API UTILITIES
+  async function apiCall(endpoint, options = {}) {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || error.error || "API request failed");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("API Error:", error);
+      throw error;
+    }
+  }
+
   // DATA STORE
 
   let APP = {
@@ -2625,8 +2664,34 @@
     currentPage: "",
   };
 
-  // this is the menu's data
-  const MENU_ITEMS = [
+  // Menu items loaded from API
+  let MENU_ITEMS = [];
+
+  async function loadMenuItems() {
+    try {
+      const items = await apiCall("/menu-items?available=1");
+      MENU_ITEMS = items.map((item) => ({
+        id: item.item_id,
+        name: item.name,
+        emoji: item.emoji || "🍽️",
+        type: item.meal_type,
+        category: item.category,
+        price: parseFloat(item.price_ksh),
+        desc: item.description || "",
+        available: item.is_available === 1,
+        imageUrl: item.image_url || "",
+      }));
+      menuItems = [...MENU_ITEMS];
+      return MENU_ITEMS;
+    } catch (error) {
+      console.error("Failed to load menu items:", error);
+      showToast("Failed to load menu items", "error");
+      return [];
+    }
+  }
+
+  // Fallback data (will be replaced by API)
+  const MENU_ITEMS_FALLBACK = [
     // Breakfast
     {
       id: 1,
@@ -2934,7 +2999,26 @@
   let nextReservationId = 100;
 
   // ── DINING TABLES ──
-  const DINING_TABLES = [
+  let DINING_TABLES = [];
+
+  async function loadDiningTables() {
+    try {
+      const tables = await apiCall("/dining-tables");
+      DINING_TABLES = tables.map((t) => ({
+        id: t.table_id,
+        number: t.table_number,
+        capacity: t.capacity,
+        location: t.location,
+        available: t.is_available === 1,
+      }));
+      return DINING_TABLES;
+    } catch (error) {
+      console.error("Failed to load dining tables:", error);
+      return [];
+    }
+  }
+
+  const DINING_TABLES_FALLBACK = [
     {
       id: 1,
       number: "T-01",
@@ -3170,43 +3254,61 @@
     return { valid, name, email, phone, id, roleSelect };
   }
 
-  function doLogin() {
+  async function doLogin() {
     const result = validateLoginForm();
-    if (!result.valid) return; // this is for abrupt login errors
+    if (!result.valid) return;
 
     const { name, email, phone, id, roleSelect } = result;
 
-    APP.user = {
-      name,
-      id,
-      email,
-      phone,
-      role: loginRole === "staff" ? "Sales Clerk" : roleSelect,
-    };
-    APP.role = loginRole;
+    try {
+      const userData = await apiCall("/users/login", {
+        method: "POST",
+        body: JSON.stringify({
+          student_id: id,
+          name: name,
+          email: email || `${id}@student.strathmore.edu`,
+          phone: phone || null,
+          role: loginRole === "staff" ? "Sales Clerk" : roleSelect,
+        }),
+      });
 
-    document.getElementById("login-screen").style.display = "none";
-    document.getElementById("app").style.display = "block";
+      APP.user = {
+        name: userData.full_name,
+        id: userData.user_id,
+        studentId: userData.student_id,
+        email: userData.email,
+        phone: userData.phone,
+        role: userData.role,
+      };
+      APP.role = loginRole;
 
-    // Set user info in sidebar
-    document.getElementById("user-display-name").textContent = name;
-    document.getElementById("user-display-id").textContent = "#" + id;
-    document.getElementById("user-avatar").textContent =
-      name.charAt(0).toUpperCase() + (name.split(" ")[1]?.charAt(0) || "");
-    document.getElementById("sidebar-role-label").textContent =
-      loginRole === "staff" ? "Staff Portal" : "Customer Portal";
-    setTimeout(() => renderNotifications(), 50);
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("app").style.display = "block";
 
-    seedData();
-    buildNav();
-    startClock();
+      document.getElementById("user-display-name").textContent =
+        userData.full_name;
+      document.getElementById("user-display-id").textContent =
+        "#" + userData.student_id;
+      document.getElementById("user-avatar").textContent =
+        userData.full_name.charAt(0).toUpperCase() +
+        (userData.full_name.split(" ")[1]?.charAt(0) || "");
+      document.getElementById("sidebar-role-label").textContent =
+        loginRole === "staff" ? "Staff Portal" : "Customer Portal";
+      setTimeout(() => renderNotifications(), 50);
 
-    if (loginRole === "staff") {
-      navigateTo("page-staff-dashboard");
-    } else {
-      document.getElementById("cart-btn").style.display = "flex";
-      document.getElementById("topbar-su-badge").style.display = "flex";
-      navigateTo("page-dashboard");
+      seedData();
+      buildNav();
+      startClock();
+
+      if (loginRole === "staff") {
+        navigateTo("page-staff-dashboard");
+      } else {
+        document.getElementById("cart-btn").style.display = "flex";
+        document.getElementById("topbar-su-badge").style.display = "flex";
+        navigateTo("page-dashboard");
+      }
+    } catch (error) {
+      showToast("Login failed: " + error.message, "error");
     }
   }
 
@@ -3388,7 +3490,7 @@
   function renderDashboard() {
     const myOrders = ORDERS.filter((o) => o.customerId === APP.user.id);
     const myRes = RESERVATIONS.filter(
-      (r) => r.customerId === APP.user.id && r.status === "confirmed"
+      (r) => r.customerId === APP.user.id && r.status === "confirmed",
     );
     const myFeedback = FEEDBACKS.filter((f) => f.userId === APP.user.id);
     const spent = myOrders
@@ -3426,7 +3528,7 @@
             o.total
           }</span>
         </div>
-      </div>`
+      </div>`,
         )
         .join("");
     }
@@ -3443,7 +3545,7 @@
         <div style="font-size:11px;color:var(--text2)">${item.type}</div>
       </div>
       <div style="font-family:'Fraunces',serif;font-weight:700;color:var(--accent)">KSh ${item.price}</div>
-    </div>`
+    </div>`,
       )
       .join("");
   }
@@ -3452,14 +3554,17 @@
 
   let activeMenuTab = "All";
 
-  function renderMenu() {
+  async function renderMenu() {
+    if (MENU_ITEMS.length === 0) {
+      await loadMenuItems();
+    }
     const types = ["All", "Breakfast", "Lunch", "Dinner", "Snacks"];
     document.getElementById("meal-tabs").innerHTML = types
       .map(
         (t) =>
           `<button class="meal-tab ${
             t === activeMenuTab ? "active" : ""
-          }" onclick="setMenuTab('${t}')">${getMealEmoji(t)} ${t}</button>`
+          }" onclick="setMenuTab('${t}')">${getMealEmoji(t)} ${t}</button>`,
       )
       .join("");
     renderMenuGrid();
@@ -3487,7 +3592,7 @@
       items = items.filter(
         (m) =>
           m.name.toLowerCase().includes(search_val.toLowerCase()) ||
-          m.desc.toLowerCase().includes(search_val.toLowerCase())
+          m.desc.toLowerCase().includes(search_val.toLowerCase()),
       );
 
     document.getElementById("menu-grid").innerHTML =
@@ -3500,8 +3605,8 @@
       <div class="menu-card-emoji">
         ${item.emoji}
         <span class="menu-card-badge ${item.available ? "" : "out"}">${
-            item.available ? item.type : "Out of Stock"
-          }</span>
+          item.available ? item.type : "Out of Stock"
+        }</span>
       </div>
       <div class="menu-card-body">
         <div class="menu-card-name">${item.name}</div>
@@ -3513,7 +3618,7 @@
           }>+ Add</button>
         </div>
       </div>
-    </div>`
+    </div>`,
         )
         .join("") ||
       `<div class="empty-state" style="grid-column:1/-1"><div class="icon">🔍</div><p>No items found.</p></div>`;
@@ -3553,7 +3658,7 @@
     const item = APP.selectedItemForModal;
     const custom = document.getElementById("item-customization").value;
     const existing = APP.cart.find(
-      (c) => c.id === item.id && c.customization === custom
+      (c) => c.id === item.id && c.customization === custom,
     );
     if (existing) {
       existing.qty += currentItemQty;
@@ -3605,7 +3710,7 @@
         <span>${c.qty}</span>
         <button onclick="updateCartItem(${i}, 1)">+</button>
       </div>
-    </div>`
+    </div>`,
       )
       .join("");
   }
@@ -3622,47 +3727,68 @@
 
   // PLACE ORDER
 
-  function placeOrder() {
+  async function placeOrder() {
     if (APP.cart.length === 0) return;
     const method = document.getElementById("payment-method").value;
     const pickup = document.getElementById("pickup-time").value;
     const total = APP.cart.reduce((s, c) => s + c.price * c.qty, 0);
-    const orderId = "ORD-" + ++nextOrderId;
-    const now = new Date().toLocaleTimeString("en-KE", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
 
-    const order = {
-      id: orderId,
-      customer: APP.user.name,
-      customerId: APP.user.id,
-      items: APP.cart.map((c) => ({
-        name: c.name,
-        qty: c.qty,
-        price: c.price,
-        unitPriceAtOrder: c.price,
-        subtotal: c.price * c.qty,
-        emoji: c.emoji,
-        customization: c.customization,
-      })),
-      total,
-      status: "pending",
-      orderType: document.getElementById("order-type").value,
-      paymentStatus: "pending",
-      time: now,
-      pickupTime: pickup,
-      payment: method,
-      type: "new",
-    };
+    try {
+      const orderData = {
+        customer_id: APP.user.id,
+        order_type: document.getElementById("order-type").value,
+        payment_method: method,
+        payment_status: "pending",
+        pickup_time: pickup || null,
+        items: APP.cart.map((c) => ({
+          item_id: c.id,
+          quantity: c.qty,
+          unit_price_ksh: c.price,
+          special_request: c.customization || null,
+        })),
+      };
 
-    ORDERS.unshift(order);
-    APP.cart = [];
-    updateCartUI();
-    document.getElementById("cart-panel").classList.remove("open");
-    buildNav(); // update badge
-    showReceipt(order);
-    showToast("🎉 Order placed successfully!", "success");
+      const createdOrder = await apiCall("/orders", {
+        method: "POST",
+        body: JSON.stringify(orderData),
+      });
+
+      const order = {
+        id: createdOrder.order_id,
+        customer: APP.user.name,
+        customerId: APP.user.id,
+        items: APP.cart.map((c) => ({
+          name: c.name,
+          qty: c.qty,
+          price: c.price,
+          unitPriceAtOrder: c.price,
+          subtotal: c.price * c.qty,
+          emoji: c.emoji,
+          customization: c.customization,
+        })),
+        total,
+        status: createdOrder.status,
+        orderType: createdOrder.order_type,
+        paymentStatus: createdOrder.payment_status,
+        time: new Date(createdOrder.ordered_at).toLocaleTimeString("en-KE", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        pickupTime: pickup,
+        payment: method,
+        type: "new",
+      };
+
+      ORDERS.unshift(order);
+      APP.cart = [];
+      updateCartUI();
+      document.getElementById("cart-panel").classList.remove("open");
+      buildNav();
+      showReceipt(order);
+      showToast("🎉 Order placed successfully!", "success");
+    } catch (error) {
+      showToast("Failed to place order: " + error.message, "error");
+    }
   }
 
   function showReceipt(order) {
@@ -3693,7 +3819,7 @@
       <div class="receipt-row">
         <span>${i.emoji} ${i.name} × ${i.qty}</span>
         <span>KSh ${(i.price * i.qty).toLocaleString()}</span>
-      </div>`
+      </div>`,
       )
       .join("")}
     <hr class="receipt-divider"/>
@@ -3726,13 +3852,47 @@
 
   // ORDERS LIST (CUSTOMER)
 
-  function renderOrders() {
-    const myOrders = ORDERS.filter((o) => o.customerId === APP.user.id);
+  async function renderOrders() {
     const el = document.getElementById("orders-list");
-    if (myOrders.length === 0) {
-      el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><h3>No orders yet</h3><p>Head to the menu to place your first order.</p><button class="btn btn-primary mt-4" style="margin-top:16px" onclick="navigateTo('page-menu')">Browse Menu</button></div>`;
+    el.innerHTML =
+      '<div style="text-align:center;padding:40px">Loading orders...</div>';
+
+    try {
+      const apiOrders = await apiCall(`/orders?customer_id=${APP.user.id}`);
+
+      ORDERS = apiOrders.map((o) => ({
+        id: o.order_id,
+        customer: APP.user.name,
+        customerId: o.customer_id,
+        items: o.items.map((i) => ({
+          name: menuItems.find((m) => m.id === i.item_id)?.name || "Item",
+          emoji: menuItems.find((m) => m.id === i.item_id)?.emoji || "🍽️",
+          qty: i.quantity,
+          price: parseFloat(i.unit_price_ksh),
+        })),
+        total: parseFloat(o.total_amount_ksh),
+        status: o.status,
+        orderType: o.order_type,
+        paymentStatus: o.payment_status,
+        time: new Date(o.ordered_at).toLocaleTimeString("en-KE", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        pickupTime: o.pickup_time || "ASAP",
+        payment: o.payment_method,
+      }));
+
+      const myOrders = ORDERS;
+      if (myOrders.length === 0) {
+        el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><h3>No orders yet</h3><p>Head to the menu to place your first order.</p><button class="btn btn-primary mt-4" style="margin-top:16px" onclick="navigateTo('page-menu')">Browse Menu</button></div>`;
+        return;
+      }
+    } catch (error) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load orders</h3><p>${error.message}</p></div>`;
       return;
     }
+
+    const myOrders = ORDERS;
     el.innerHTML = myOrders
       .map(
         (o) => `
@@ -3752,7 +3912,7 @@
         ${o.items
           .map(
             (i) =>
-              `<span style="background:var(--bg2);padding:4px 10px;border-radius:12px;font-size:12px">${i.emoji} ${i.name} ×${i.qty}</span>`
+              `<span style="background:var(--bg2);padding:4px 10px;border-radius:12px;font-size:12px">${i.emoji} ${i.name} ×${i.qty}</span>`,
           )
           .join("")}
       </div>
@@ -3779,7 +3939,7 @@
           }
         </div>
       </div>
-    </div>`
+    </div>`,
       )
       .join("");
   }
@@ -3807,9 +3967,40 @@
 
   // RESERVATIONS (CUSTOMER)
 
-  function renderReservations() {
-    const myRes = RESERVATIONS.filter((r) => r.customerId === APP.user.id);
+  async function renderReservations() {
     const el = document.getElementById("reservations-list");
+    el.innerHTML =
+      '<div style="text-align:center;padding:40px">Loading reservations...</div>';
+
+    if (DINING_TABLES.length === 0) {
+      await loadDiningTables();
+    }
+
+    try {
+      const apiReservations = await apiCall(
+        `/reservations?customer_id=${APP.user.id}`,
+      );
+      RESERVATIONS = apiReservations.map((r) => ({
+        id: r.reservation_id,
+        customer: APP.user.name,
+        customerId: r.customer_id,
+        tableId: r.table_id,
+        tableNum:
+          r.table_number ||
+          DINING_TABLES.find((t) => t.id === r.table_id)?.number ||
+          "N/A",
+        party: r.party_size,
+        time: r.reservation_time,
+        deadline: r.deadline_time || "N/A",
+        notes: r.notes || "",
+        status: r.status,
+      }));
+    } catch (error) {
+      console.error("Failed to load reservations:", error);
+      RESERVATIONS = [];
+    }
+
+    const myRes = RESERVATIONS;
 
     if (myRes.length === 0) {
       el.innerHTML = `<div class="empty-state"><div class="icon">📅</div><h3>No reservations</h3><p>Book a table for a seamless dining experience.</p></div>`;
@@ -3837,7 +4028,7 @@
             r.id
           }')">Cancel</button>
         </div>
-      </div>`
+      </div>`,
         )
         .join("");
     }
@@ -3846,7 +4037,7 @@
     document.getElementById("tables-overview").innerHTML = DINING_TABLES.map(
       (t) => {
         const isBooked = RESERVATIONS.some(
-          (r) => r.tableId === t.id && r.status === "confirmed"
+          (r) => r.tableId === t.id && r.status === "confirmed",
         );
         const avail = t.available && !isBooked;
         return `
@@ -3858,7 +4049,7 @@
           avail ? "var(--green)" : "var(--red)"
         }">${avail ? "✓ Available" : "✗ Occupied"}</div>
       </div>`;
-      }
+      },
     ).join("");
   }
 
@@ -3871,12 +4062,15 @@
     }
   }
 
-  function openReservationModal() {
+  async function openReservationModal() {
     APP.selectedTable = null;
+    if (DINING_TABLES.length === 0) {
+      await loadDiningTables();
+    }
     const grid = document.getElementById("modal-table-grid");
     grid.innerHTML = DINING_TABLES.map((t) => {
       const isBooked = RESERVATIONS.some(
-        (r) => r.tableId === t.id && r.status === "confirmed"
+        (r) => r.tableId === t.id && r.status === "confirmed",
       );
       const avail = t.available && !isBooked;
       return `
@@ -3902,7 +4096,7 @@
       });
   }
 
-  function makeReservation() {
+  async function makeReservation() {
     if (!APP.selectedTable) {
       showToast("Please select a table first.", "error");
       return;
@@ -3914,32 +4108,51 @@
     const [h, m] = time.split(":").map(Number);
     const deadline = `${String(h).padStart(2, "0")}:${String(m + 15).padStart(
       2,
-      "0"
+      "0",
     )}`;
 
-    const res = {
-      id: "RES-" + ++nextReservationId,
-      customer: APP.user.name,
-      customerId: APP.user.id,
-      tableId: APP.selectedTable,
-      tableNum: table.number,
-      party: parseInt(party),
-      time,
-      deadline,
-      notes,
-      status: "confirmed",
-    };
-    RESERVATIONS.unshift(res);
-    closeModal("reservation-modal");
-    renderReservations();
-    showToast(`Table ${table.number} reserved for ${time}!`, "success");
+    try {
+      const reservationData = {
+        customer_id: APP.user.id,
+        table_id: APP.selectedTable,
+        party_size: parseInt(party),
+        reservation_time: time,
+        deadline_time: deadline,
+        notes: notes || null,
+        status: "confirmed",
+      };
+
+      const createdRes = await apiCall("/reservations", {
+        method: "POST",
+        body: JSON.stringify(reservationData),
+      });
+
+      const res = {
+        id: createdRes.reservation_id,
+        customer: APP.user.name,
+        customerId: APP.user.id,
+        tableId: APP.selectedTable,
+        tableNum: table.number,
+        party: parseInt(party),
+        time,
+        deadline,
+        notes,
+        status: createdRes.status,
+      };
+      RESERVATIONS.unshift(res);
+      closeModal("reservation-modal");
+      renderReservations();
+      showToast(`Table ${table.number} reserved for ${time}!`, "success");
+    } catch (error) {
+      showToast("Failed to create reservation: " + error.message, "error");
+    }
   }
 
   // FEEDBACK
 
   function renderFeedback() {
     const myOrders = ORDERS.filter(
-      (o) => o.customerId === APP.user.id && o.status === "completed"
+      (o) => o.customerId === APP.user.id && o.status === "completed",
     );
     const sel = document.getElementById("feedback-order-select");
     sel.innerHTML =
@@ -3949,7 +4162,7 @@
           (o) =>
             `<option value="${o.id}">${o.id} — ${o.items[0].name}${
               o.items.length > 1 ? " +" + (o.items.length - 1) + " more" : ""
-            }</option>`
+            }</option>`,
         )
         .join("");
 
@@ -3975,7 +4188,7 @@
         <p style="font-size:13px;color:var(--text2)">${
           f.comment || "No comment"
         }</p>
-      </div>`
+      </div>`,
         )
         .join("");
     }
@@ -4040,7 +4253,7 @@
     const completed = ORDERS.filter((o) => o.status === "completed").length;
     const revenue = ORDERS.filter((o) => o.status === "completed").reduce(
       (s, o) => s + o.total,
-      0
+      0,
     );
     const lowStock = INVENTORY.filter((i) => i.quantity <= i.reorder).length;
 
@@ -4059,7 +4272,7 @@
           o.items.some((i) => {
             const m = menuItems.find((m) => m.name === i.name);
             return m && m.type === t;
-          })
+          }),
         ).length;
         const pct = Math.round((count / Math.max(ORDERS.length, 1)) * 100);
         return `
@@ -4073,7 +4286,7 @@
 
     // Queue
     const queue = ORDERS.filter((o) =>
-      ["pending", "confirmed", "ready"].includes(o.status)
+      ["pending", "confirmed", "ready"].includes(o.status),
     );
     document.getElementById("staff-queue").innerHTML =
       queue.length === 0
@@ -4087,7 +4300,7 @@
             <div style="font-size:11px;color:var(--text3)">Pickup: ${o.pickupTime}</div>
           </div>
           <span class="badge badge-${o.status}">${o.status}</span>
-        </div>`
+        </div>`,
             )
             .join("");
   }
@@ -4115,7 +4328,7 @@
         ${o.items
           .map(
             (i) =>
-              `<span style="font-size:12px;display:block">${i.emoji} ${i.name} ×${i.qty}</span>`
+              `<span style="font-size:12px;display:block">${i.emoji} ${i.name} ×${i.qty}</span>`,
           )
           .join("")}
       </td>
@@ -4132,8 +4345,8 @@
         }</div>
       </td>
       <td><span class="badge badge-${o.status}">${statusIcon(o.status)} ${
-            o.status
-          }</span></td>
+        o.status
+      }</span></td>
       <td><span style="font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;color:${
         (o.paymentStatus || "pending") === "paid"
           ? "var(--green)"
@@ -4163,7 +4376,7 @@
           }
         </div>
       </td>
-    </tr>`
+    </tr>`,
         )
         .join("") ||
       `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text2)">No orders found</td></tr>`;
@@ -4185,58 +4398,76 @@
       };
       showToast(
         msgs[status] || "Status updated",
-        status === "cancelled" ? "error" : "success"
+        status === "cancelled" ? "error" : "success",
       );
     }
   }
 
   // INVENTORY (STAFF)
 
-  function renderInventory() {
-    document.getElementById("inventory-tbody").innerHTML = INVENTORY.map(
-      (item) => {
-        const pct = Math.min(
-          100,
-          Math.round((item.quantity / (item.reorder * 5)) * 100)
-        );
+  async function renderInventory() {
+    const tbody = document.getElementById("inventory-tbody");
+    tbody.innerHTML =
+      '<tr><td colspan="9" style="text-align:center;padding:40px">Loading inventory...</td></tr>';
+
+    try {
+      const apiInventory = await apiCall("/inventory");
+      INVENTORY = apiInventory.map((item) => ({
+        id: item.inventory_id,
+        name: item.name,
+        category: item.category,
+        quantity: parseFloat(item.quantity),
+        unit: item.unit,
+        reorder: parseFloat(item.reorder_level),
+        unitCost: parseFloat(item.unit_cost_ksh),
+        stockPct: item.stock_pct ? parseInt(item.stock_pct) : null,
+        stockStatus: item.stock_status || "OK",
+      }));
+
+      tbody.innerHTML = INVENTORY.map((item) => {
+        const pct =
+          item.stockPct ||
+          Math.min(100, Math.round((item.quantity / (item.reorder * 5)) * 100));
         const level = pct > 50 ? "high" : pct > 25 ? "medium" : "low";
         const status = item.quantity <= item.reorder ? "low" : "ok";
         return `
-      <tr>
-        <td style="font-weight:600">${item.name}</td>
-        <td><span style="background:var(--bg2);padding:3px 8px;border-radius:6px;font-size:12px">${
-          item.category
-        }</span></td>
-        <td style="font-family:'Fraunces',serif;font-size:18px;font-weight:700">${
-          item.quantity
-        }</td>
-        <td style="color:var(--text2)">${item.unit}</td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">KSh ${(
-          item.unitCost || 0
-        ).toLocaleString()}</td>
-        <td style="min-width:120px">
-          <div class="stock-bar"><div class="stock-fill ${level}" style="width:${pct}%"></div></div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">${pct}% stocked</div>
-        </td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${
-          item.reorder
-        } ${item.unit}</td>
-        <td><span class="badge badge-${status}">${
-          status === "low" ? "⚠️ Low Stock" : "✓ OK"
-        }</span></td>
-        <td>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm" onclick="editInventory(${
-              item.id
-            })">Edit</button>
-            <button class="btn btn-green btn-sm" onclick="restockItem(${
-              item.id
-            })">+ Restock</button>
-          </div>
-        </td>
-      </tr>`;
-      }
-    ).join("");
+        <tr>
+          <td style="font-weight:600">${item.name}</td>
+          <td><span style="background:var(--bg2);padding:3px 8px;border-radius:6px;font-size:12px">${
+            item.category
+          }</span></td>
+          <td style="font-family:'Fraunces',serif;font-size:18px;font-weight:700">${
+            item.quantity
+          }</td>
+          <td style="color:var(--text2)">${item.unit}</td>
+          <td style="font-family:'JetBrains Mono',monospace;font-size:12px">KSh ${(
+            item.unitCost || 0
+          ).toLocaleString()}</td>
+          <td style="min-width:120px">
+            <div class="stock-bar"><div class="stock-fill ${level}" style="width:${pct}%"></div></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">${pct}% stocked</div>
+          </td>
+          <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${
+            item.reorder
+          } ${item.unit}</td>
+          <td><span class="badge badge-${status}">${
+            status === "low" ? "⚠️ Low Stock" : "✓ OK"
+          }</span></td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary btn-sm" onclick="editInventory(${
+                item.id
+              })">Edit</button>
+              <button class="btn btn-green btn-sm" onclick="restockItem(${
+                item.id
+              })">+ Restock</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join("");
+    } catch (error) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--red)">Failed to load inventory: ${error.message}</td></tr>`;
+    }
   }
 
   function openAddInventoryModal() {
@@ -4244,7 +4475,7 @@
     document.getElementById("inv-modal-title").textContent =
       "Add Inventory Item";
     ["inv-name", "inv-quantity", "inv-reorder"].forEach(
-      (id) => (document.getElementById(id).value = "")
+      (id) => (document.getElementById(id).value = ""),
     );
     openModal("inventory-modal");
   }
@@ -4279,7 +4510,7 @@
     renderInventory();
     showToast(
       `${item.name} restocked! New qty: ${item.quantity} ${item.unit}`,
-      "success"
+      "success",
     );
   }
 
@@ -4337,9 +4568,9 @@
           <div><div style="font-weight:600">${
             item.name
           }</div><div style="font-size:12px;color:var(--text2)">${item.desc.substring(
-          0,
-          50
-        )}...</div></div>
+            0,
+            50,
+          )}...</div></div>
         </div>
       </td>
       <td>${item.category}</td>
@@ -4352,8 +4583,8 @@
           <input type="checkbox" ${
             item.available ? "checked" : ""
           } onchange="toggleMenuAvail(${
-          item.id
-        },this.checked)" style="width:16px;height:16px;accent-color:var(--green)"/>
+            item.id
+          },this.checked)" style="width:16px;height:16px;accent-color:var(--green)"/>
           <span style="font-size:12px;color:${
             item.available ? "var(--green)" : "var(--red)"
           }">${item.available ? "Yes" : "No"}</span>
@@ -4369,7 +4600,7 @@
           })">Del</button>
         </div>
       </td>
-    </tr>`
+    </tr>`,
       )
       .join("");
   }
@@ -4380,7 +4611,7 @@
       item.available = val;
       showToast(
         `${item.name} marked ${val ? "available" : "unavailable"}`,
-        "info"
+        "info",
       );
     }
   }
@@ -4389,7 +4620,7 @@
     document.getElementById("menu-edit-id").value = "";
     document.getElementById("menu-modal-title").textContent = "Add Menu Item";
     ["menu-item-name", "menu-item-emoji", "menu-item-desc"].forEach(
-      (id) => (document.getElementById(id).value = "")
+      (id) => (document.getElementById(id).value = ""),
     );
     document.getElementById("menu-item-price").value = "";
     document.getElementById("menu-item-available").checked = true;
@@ -4477,7 +4708,7 @@
       ? (
           FEEDBACKS.reduce(
             (s, f) => s + ((f.foodRating || 0) + (f.serviceRating || 0)) / 2,
-            0
+            0,
           ) / FEEDBACKS.length
         ).toFixed(1)
       : "N/A";
@@ -4493,7 +4724,7 @@
     ORDERS.forEach((o) =>
       o.items.forEach((i) => {
         itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
-      })
+      }),
     );
     const topItems = Object.entries(itemCounts)
       .sort((a, b) => b[1] - a[1])
@@ -4506,13 +4737,13 @@
     <div class="chart-bar-row">
       <div class="chart-bar-label" style="min-width:120px">${name.substring(
         0,
-        14
+        14,
       )}</div>
       <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round(
-        (count / maxCount) * 100
+        (count / maxCount) * 100,
       )}%"></div></div>
       <div class="chart-bar-val">${count} sold</div>
-    </div>`
+    </div>`,
         )
         .join("") ||
       '<p style="color:var(--text2);font-size:13px">No data yet</p>';
@@ -4524,7 +4755,7 @@
         const m = menuItems.find((m) => m.name === i.name);
         if (m)
           typeRevenue[m.type] = (typeRevenue[m.type] || 0) + i.price * i.qty;
-      })
+      }),
     );
     const maxRev = Math.max(...Object.values(typeRevenue), 1);
     document.getElementById("meal-revenue-chart").innerHTML =
@@ -4534,10 +4765,10 @@
     <div class="chart-bar-row">
       <div class="chart-bar-label">${t}</div>
       <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round(
-        (rev / maxRev) * 100
+        (rev / maxRev) * 100,
       )}%;background:var(--green)"></div></div>
       <div class="chart-bar-val">KSh ${rev.toLocaleString()}</div>
-    </div>`
+    </div>`,
         )
         .join("") ||
       '<p style="color:var(--text2);font-size:13px">No data yet</p>';
@@ -4555,7 +4786,7 @@
         o.time
       }</td>
       <td><span class="badge badge-${o.status}">${o.status}</span></td>
-    </tr>`
+    </tr>`,
     ).join("");
   }
 
@@ -4566,7 +4797,7 @@
     document.getElementById("staff-tables-grid").innerHTML = DINING_TABLES.map(
       (t) => {
         const isBooked = RESERVATIONS.some(
-          (r) => r.tableId === t.id && r.status === "confirmed"
+          (r) => r.tableId === t.id && r.status === "confirmed",
         );
         const avail = t.available && !isBooked;
         return `
@@ -4584,7 +4815,7 @@
             : ""
         }
       </div>`;
-      }
+      },
     ).join("");
 
     document.getElementById("reservations-tbody").innerHTML =
@@ -4614,14 +4845,14 @@
             : "—"
         }
       </td>
-    </tr>`
+    </tr>`,
       ).join("") ||
       `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2)">No reservations found</td></tr>`;
   }
 
   function releaseTable(id) {
     RESERVATIONS.filter((r) => r.tableId === id).forEach(
-      (r) => (r.status = "cancelled")
+      (r) => (r.status = "cancelled"),
     );
     renderStaffReservations();
     showToast("Table released.", "info");
@@ -4714,9 +4945,9 @@
             <span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${
               m.color
             };text-transform:uppercase;letter-spacing:1px">${n.type.replace(
-        /_/g,
-        " "
-      )}</span>
+              /_/g,
+              " ",
+            )}</span>
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${
               n.sentAt
             }</span>
@@ -4770,7 +5001,7 @@
         const item = INVENTORY.find((i) => i.id === t.inventoryId);
         return `<tr>
         <td style="font-family:'JetBrains Mono',monospace;font-size:11px">#${String(
-          t.txnId
+          t.txnId,
         ).slice(-6)}</td>
         <td style="font-weight:600">${item ? item.name : "Unknown"}</td>
         <td><span style="background:var(--bg2);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;color:${
@@ -4801,7 +5032,7 @@
     const revenue = done.reduce((s, o) => s + o.total, 0);
     const itemsSold = done.reduce(
       (s, o) => s + o.items.reduce((ss, i) => ss + i.qty, 0),
-      0
+      0,
     );
     const report = {
       reportDate: today,
@@ -4835,7 +5066,7 @@
           <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)">${
             r.generatedAt
           }</td>
-        </tr>`
+        </tr>`,
         ).join("");
   }
 
